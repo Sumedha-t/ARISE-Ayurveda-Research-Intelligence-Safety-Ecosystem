@@ -31,6 +31,18 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (!user && request.nextUrl.pathname.startsWith("/api/fhir/")) {
+    const unauthorizedResponse = NextResponse.json(
+      { error: "Unauthorized." },
+      { status: 401 },
+    );
+    response.cookies
+      .getAll()
+      .forEach((cookie) => unauthorizedResponse.cookies.set(cookie));
+
+    return unauthorizedResponse;
+  }
+
   if (!user && request.nextUrl.pathname !== "/login") {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
