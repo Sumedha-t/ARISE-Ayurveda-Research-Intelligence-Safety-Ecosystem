@@ -50,14 +50,15 @@ export default function LoginPage() {
           <div className="space-y-6">
             {/* Real Logo Container */}
             <div className="flex items-center gap-3">
-              <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#2D5A27]/10 border border-[#2D5A27]/25 p-1">
+              <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white border border-[#E5DFD3] shadow-xs">
                 {!logoError ? (
                   <Image
                     src="/logo.png"
                     alt="ARISE Logo"
-                    width={40}
-                    height={40}
-                    className="object-contain"
+                    width={48}
+                    height={48}
+                    className="h-full w-full object-cover"
+                    priority
                     onError={() => setLogoError(true)}
                   />
                 ) : (

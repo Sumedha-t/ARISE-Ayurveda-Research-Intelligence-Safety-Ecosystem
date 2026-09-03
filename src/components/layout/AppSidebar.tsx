@@ -37,25 +37,28 @@ export function AppSidebar({ userRole = "ADMIN" }: { userRole?: string }) {
   return (
     <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-[#E5DFD3] bg-[#FCFAF7] text-[#25231F] shadow-xs">
       {/* Brand Header */}
-      <div className="flex h-16 items-center gap-3 border-b border-[#E5DFD3] px-5 bg-[#FAF7F0]">
-        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#2D5A27]/10 border border-[#2D5A27]/20">
+      <div className="flex items-center gap-3 px-6 py-5 border-b border-[#E5DFD3]">
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white border border-[#E5DFD3] flex items-center justify-center shadow-xs">
           {!logoError ? (
             <Image
               src="/logo.png"
               alt="ARISE Logo"
-              width={30}
-              height={30}
-              className="object-contain"
+              width={40}
+              height={40}
+              className="h-full w-full object-cover"
+              priority
               onError={() => setLogoError(true)}
             />
           ) : (
             <Leaf className="h-5 w-5 text-[#2D5A27]" />
           )}
         </div>
-        <div className="flex flex-col">
-          <span className="font-bold text-sm tracking-tight text-[#25231F]">ARISE CTMS</span>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#2D5A27]">
-            AIIA AYUSH Platform
+        <div>
+          <h1 className="text-base font-black tracking-tight text-[#25231F] leading-none">
+            ARISE CTMS
+          </h1>
+          <span className="text-[10px] font-semibold text-[#2D5A27] tracking-wider uppercase block mt-1">
+            All India Institute of Ayurveda
           </span>
         </div>
       </div>
