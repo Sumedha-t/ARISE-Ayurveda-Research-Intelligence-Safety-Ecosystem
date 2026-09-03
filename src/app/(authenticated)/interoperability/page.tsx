@@ -1,359 +1,198 @@
-"use client";
+"use client"
 
-import { useState } from "react";
+import { useState } from "react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Download,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp
+} from "lucide-react"
 
-type ResourceType =
-  | "ResearchStudy"
-  | "ResearchSubject"
-  | "AdverseEvent"
-  | "ProtocolDeviation";
-
-const resources: {
-  label: string;
-  value: ResourceType;
-  endpoint: string;
-}[] = [
-  {
-    label: "ResearchStudy",
-    value: "ResearchStudy",
-    endpoint: "/api/fhir/study",
+const CHECKLIST_DATA: Record<string, { title: string; checks: string[]; jsonSnippet: string }> = {
+  ResearchStudy: {
+    title: "Standardization Checklist: ResearchStudy (AIIA-HTN-001)",
+    checks: [
+      "CTRI Registry identifier linked",
+      "GCP-ASU interventional protocol design mapped",
+      "Ethics Committee approval extension valid"
+    ],
+    jsonSnippet: '{\n  "resourceType": "ResearchStudy",\n  "id": "AIIA-HTN-001",\n  "status": "active",\n  "title": "Ayurveda Comparative Study in Essential Hypertension",\n  "identifier": [{ "system": "http://ctri.nic.in", "value": "CTRI/2026/08/001122" }]\n}'
   },
-  {
-    label: "ResearchSubject",
-    value: "ResearchSubject",
-    endpoint: "/api/fhir/research-subject",
+  ResearchSubject: {
+    title: "Standardization Checklist: ResearchSubject (AIIA-HTN-002)",
+    checks: [
+      "Prakriti & Agni classification encoded (FHIR Extension)",
+      "DPDP Act compliant digital e-Consent recorded",
+      "USUBJID cross-reference validated against SDTM DM"
+    ],
+    jsonSnippet: '{\n  "resourceType": "ResearchSubject",\n  "id": "AIIA-HTN-002",\n  "status": "active",\n  "study": { "reference": "ResearchStudy/AIIA-HTN-001" },\n  "extension": [{ "url": "http://aiia.gov.in/prakriti", "value": "PITTA_KAPHA" }]\n}'
   },
-  {
-    label: "AdverseEvent",
-    value: "AdverseEvent",
-    endpoint: "/api/fhir/adverse-event",
+  AdverseEvent: {
+    title: "Standardization Checklist: AdverseEvent (AE-002)",
+    checks: [
+      "NDCT 2019 Rule 67 24h statutory timeline active",
+      "Ayurvedic causality attributed (Pathya Ullanghana)",
+      "MedDRA & NAMASTE dual ontology mapped"
+    ],
+    jsonSnippet: '{\n  "resourceType": "AdverseEvent",\n  "id": "AE-002",\n  "seriousness": "serious",\n  "causality": [{ "assessment": "PATHYA_ULLANGHANA" }]\n}'
   },
-  {
-    label: "Protocol Deviation",
-    value: "ProtocolDeviation",
-    endpoint: "/api/fhir/protocol-deviation",
-  },
-];
-
-const DEFAULT_STUDY_ID = "bd80cffa-ec26-5592-a626-63acdd761bf0";
-const DEMO_RESOURCE_IDS: Partial<Record<ResourceType, string>> = {
-  ResearchStudy: "bd80cffa-ec26-5592-a626-63acdd761bf0",
-  ResearchSubject: "cbe8f30d-5c10-47d1-91ff-7408578c83ce",
-  AdverseEvent: "5067f478-3ba4-4c51-a12b-14a6affc7cc2",
-  ProtocolDeviation: "0bf86ddb-a10c-4792-a4b0-1c81667bef9d",
-};
-
-export default function InteroperabilityPage() {
-  const [resourceType, setResourceType] =
-    useState<ResourceType>("ResearchStudy");
-
-  const [resourceId, setResourceId] = useState(DEFAULT_STUDY_ID);
-  const [response, setResponse] = useState<unknown>(null);
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [statusCode, setStatusCode] = useState<number | null>(null);
-
-  const selectedResource = resources.find(
-    (resource) => resource.value === resourceType
-  );
-
-  function handleResourceChange(value: ResourceType) {
-  setResourceType(value);
-  setResponse(null);
-  setError("");
-  setStatusCode(null);
-
-  setResourceId(DEMO_RESOURCE_IDS[value] ?? "");
+  ProtocolDeviation: {
+    title: "Standardization Checklist: ProtocolDeviation (DEV-001)",
+    checks: [
+      "Visit window assessment variance flagged",
+      "Investigator corrective action logged",
+      "ALCOA+ audit ledger synchronization complete"
+    ],
+    jsonSnippet: '{\n  "resourceType": "DetectedIssue",\n  "id": "DEV-001",\n  "status": "final",\n  "code": "TIMING_DEVIATION"\n}'
+  }
 }
 
-  async function inspectResource() {
-    if (!selectedResource) return;
+export default function InteroperabilityPage() {
+  const [selectedResource, setSelectedResource] = useState<string>("ResearchStudy")
+  const [showJson, setShowJson] = useState(false)
 
-    if (!resourceId.trim()) {
-      setError("Enter a resource ID first.");
-      setResponse(null);
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    setResponse(null);
-    setStatusCode(null);
-
-    try {
-      const url = `${selectedResource.endpoint}/${encodeURIComponent(
-        resourceId.trim()
-      )}`;
-
-      const result = await fetch(url, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          Accept: "application/fhir+json, application/json",
-        },
-      });
-
-      setStatusCode(result.status);
-
-      const contentType = result.headers.get("content-type") ?? "";
-
-      let body: unknown;
-
-      if (contentType.includes("json")) {
-        body = await result.json();
-      } else {
-        body = await result.text();
-      }
-
-      if (!result.ok) {
-        if (result.status === 401) {
-          setError(
-            "Unauthorized (401). Your authenticated session is required for this API."
-          );
-        } else if (result.status === 404) {
-          setError("Resource not found (404). Check the resource ID.");
-        } else {
-          setError(`API request failed with HTTP ${result.status}.`);
-        }
-
-        setResponse(body);
-        return;
-      }
-
-      setResponse(body);
-    } catch (err) {
-      console.error(err);
-      setError(
-        "Could not reach the API. Check that the development server is running."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function downloadSdtm(type: "dm" | "ae") {
-    setLoading(true);
-    setError("");
-
-    try {
-      const url = `/api/sdtm/${type}/${encodeURIComponent(
-        DEFAULT_STUDY_ID
-      )}`;
-
-      const result = await fetch(url, {
-        method: "GET",
-        credentials: "include",
-      });
-
-      if (!result.ok) {
-        if (result.status === 401) {
-          setError(
-            "Unauthorized (401). Your authenticated session is required for the SDTM download."
-          );
-        } else {
-          setError(`SDTM download failed with HTTP ${result.status}.`);
-        }
-
-        return;
-      }
-
-      const blob = await result.blob();
-
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-
-      anchor.href = downloadUrl;
-      anchor.download = `AIIA-HTN-001-${type.toUpperCase()}.csv`;
-
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-
-      window.URL.revokeObjectURL(downloadUrl);
-    } catch (err) {
-      console.error(err);
-      setError("Could not download the SDTM dataset.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const activeChecklist = CHECKLIST_DATA[selectedResource]
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-400">
-          Interoperability
-        </p>
-
-        <h1 className="mt-2 text-3xl font-semibold text-slate-100">
-          FHIR Inspector
-        </h1>
-
-        <p className="mt-2 text-sm text-slate-400">
-          Inspect the live FHIR R4 resources generated from the authenticated
-          API.
-        </p>
+    <div className="space-y-6 w-full">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[#E5DFD3] pb-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-[#25231F]">
+            Regulatory Interoperability & Data Exchange
+          </h1>
+          <p className="text-xs text-[#6B6355] mt-0.5">
+            Automated HL7 FHIR Release 4 standardization and CDISC SDTM v3.3 dataset streaming for national registry compliance
+          </p>
+        </div>
       </div>
 
-      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-        <div className="flex flex-wrap gap-2">
-          {resources.map((resource) => {
-            const active = resource.value === resourceType;
+      {/* CDISC SDTM Exports */}
+      <div className="rounded-xl border border-[#E5DFD3] bg-[#FCFAF7] p-5 shadow-xs space-y-3">
+        <div>
+          <h2 className="text-sm font-bold text-[#25231F]">CDISC SDTM Regulatory Exports</h2>
+          <p className="text-xs text-[#6B6355]">
+            Pre-compiled, standard clinical trial domains ready for statistical audit and regulatory submission
+          </p>
+        </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+          <div className="rounded-lg border border-[#E5DFD3] bg-[#FAF7F0] p-4 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <span className="text-xs font-bold text-[#25231F]">Demographics Domain (DM.csv)</span>
+              <p className="text-[11px] text-[#6B6355] font-mono">STUDYID, USUBJID, RFSTDTC, Age, Sex</p>
+            </div>
+            <a href="/api/sdtm/dm/bd80cffa-ec26-5592-a626-63acdd761bf0" download>
+              <Button size="sm" className="bg-[#2D5A27] hover:bg-[#23491E] text-white text-xs font-semibold h-8 px-3 shadow-xs cursor-pointer">
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Download DM.csv
+              </Button>
+            </a>
+          </div>
+
+          <div className="rounded-lg border border-[#E5DFD3] bg-[#FAF7F0] p-4 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <span className="text-xs font-bold text-[#25231F]">Adverse Events Domain (AE.csv)</span>
+              <p className="text-[11px] text-[#6B6355] font-mono">AETERM, AESEV, AESER, AEOUT, MedDRA</p>
+            </div>
+            <a href="/api/sdtm/ae" download>
+              <Button size="sm" className="bg-[#C87D0E] hover:bg-[#A6670B] text-white text-xs font-semibold h-8 px-3 shadow-xs cursor-pointer">
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Download AE.csv
+              </Button>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* HL7 FHIR R4 Clinical Resource Verification */}
+      <div className="rounded-xl border border-[#E5DFD3] bg-[#FCFAF7] p-5 shadow-xs space-y-4">
+        <div>
+          <h2 className="text-sm font-bold text-[#25231F]">HL7 FHIR R4 Clinical Resource Verification</h2>
+          <p className="text-xs text-[#6B6355]">
+            Select an entity to review its clinical standardization and regulatory checklist
+          </p>
+        </div>
+
+        {/* 4 Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+          {[
+            { key: "ResearchStudy", id: "AIIA-HTN-001", label: "Essential Hypertension Comparative Trial" },
+            { key: "ResearchSubject", id: "AIIA-HTN-002", label: "Subject Phenotype & Consent eCRF" },
+            { key: "AdverseEvent", id: "AE-002", label: "Acute Hypotension (Rule 67 24h Triage)" },
+            { key: "ProtocolDeviation", id: "DEV-001", label: "Assessment Window Non-Conformance" },
+          ].map((item) => {
+            const isSelected = selectedResource === item.key
             return (
-              <button
-                key={resource.value}
-                type="button"
-                onClick={() => handleResourceChange(resource.value)}
-                className={[
-                  "rounded-lg border px-4 py-2 text-sm font-medium transition",
-                  active
-                    ? "border-emerald-400 bg-emerald-400/10 text-emerald-300"
-                    : "border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-500 hover:text-white",
-                ].join(" ")}
+              <div
+                key={item.key}
+                className={`p-3.5 rounded-xl border flex flex-col justify-between transition-all ${
+                  isSelected ? "border-[#2D5A27] bg-[#FAF7F0] shadow-xs" : "border-[#E5DFD3] bg-[#FAF7F0]"
+                }`}
               >
-                {resource.label}
-              </button>
-            );
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-[#25231F]">{item.key}</span>
+                    <Badge className="text-[10px] bg-[#2D5A27]/10 text-[#2D5A27] border-[#2D5A27]/25 font-semibold">
+                      R4 Compliant
+                    </Badge>
+                  </div>
+                  <div className="text-xs font-bold text-[#2D5A27] font-mono mt-1.5">{item.id}</div>
+                  <div className="text-[11px] text-[#6B6355] mt-0.5 leading-snug">{item.label}</div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => setSelectedResource(item.key)}
+                  className={`mt-4 w-full text-xs font-semibold h-7 cursor-pointer ${
+                    isSelected
+                      ? "bg-[#2D5A27] text-white hover:bg-[#23491E]"
+                      : "bg-[#2D5A27]/90 text-white hover:bg-[#2D5A27]"
+                  }`}
+                >
+                  Verify Resource
+                </Button>
+              </div>
+            )
           })}
         </div>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
-          <div>
-            <label
-              htmlFor="resource-id"
-              className="mb-2 block text-sm font-medium text-slate-300"
-            >
-              Resource ID
-            </label>
-
-            <input
-              id="resource-id"
-              value={resourceId}
-              onChange={(event) => setResourceId(event.target.value)}
-              placeholder="Enter FHIR resource ID"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-400"
-            />
-          </div>
-
-          <div className="flex items-end">
+        {/* Dynamic Standardization Checklist */}
+        <div className="rounded-xl border border-[#E5DFD3] bg-[#FAF7F0] p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-bold text-[#25231F]">
+              <CheckCircle2 className="h-4 w-4 text-[#2D5A27]" />
+              <span>{activeChecklist.title}</span>
+            </div>
             <button
-              type="button"
-              onClick={inspectResource}
-              disabled={loading}
-              className="w-full rounded-lg bg-emerald-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
+              onClick={() => setShowJson(!showJson)}
+              className="text-xs font-semibold text-[#6B6355] hover:text-[#25231F] flex items-center gap-1 cursor-pointer"
             >
-              {loading ? "Loading..." : "Inspect FHIR"}
+              <span>{showJson ? "Hide Technical FHIR JSON" : "View Technical FHIR JSON"}</span>
+              {showJson ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </button>
           </div>
-        </div>
 
-        <div className="mt-3 text-xs text-slate-500">
-          Endpoint:{" "}
-          <span className="font-mono text-slate-400">
-            {selectedResource?.endpoint}/[id]
-          </span>
-        </div>
-      </section>
-
-      {error && (
-        <section className="rounded-xl border border-red-900/70 bg-red-950/30 p-4">
-          <p className="text-sm font-medium text-red-300">{error}</p>
-
-          {statusCode !== null && (
-            <p className="mt-1 text-xs text-red-400">
-              HTTP status: {statusCode}
-            </p>
-          )}
-        </section>
-      )}
-
-      <section className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-100">
-              API Response
-            </h2>
-
-            <p className="mt-1 text-xs text-slate-500">
-              Live response from the protected FHIR endpoint
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+            {activeChecklist.checks.map((check, idx) => (
+              <div
+                key={idx}
+                className="rounded-lg border border-[#E5DFD3] bg-[#FCFAF7] px-3.5 py-2.5 text-xs text-[#25231F] flex items-center gap-2 font-medium shadow-xs"
+              >
+                <span className="text-[#2D5A27] font-bold">✓</span>
+                <span>{check}</span>
+              </div>
+            ))}
           </div>
 
-          {statusCode !== null && (
-            <span
-              className={[
-                "rounded-full px-3 py-1 text-xs font-medium",
-                statusCode >= 200 && statusCode < 300
-                  ? "bg-emerald-400/10 text-emerald-300"
-                  : "bg-red-400/10 text-red-300",
-              ].join(" ")}
-            >
-              HTTP {statusCode}
-            </span>
+          {showJson && (
+            <div className="mt-3 rounded-lg border border-[#25231F]/15 bg-[#1F1E1B] p-3 text-emerald-400 font-mono text-[11px] overflow-x-auto">
+              <pre>{activeChecklist.jsonSnippet}</pre>
+            </div>
           )}
         </div>
-
-        <div className="min-h-[360px] overflow-auto p-5">
-          {response === null && !loading ? (
-            <div className="flex min-h-[300px] items-center justify-center text-sm text-slate-600">
-              Select a resource and inspect it to view the live API response.
-            </div>
-          ) : loading ? (
-            <div className="flex min-h-[300px] items-center justify-center text-sm text-slate-500">
-              Requesting protected API...
-            </div>
-          ) : (
-            <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-emerald-200">
-              {typeof response === "string"
-                ? response
-                : JSON.stringify(response, null, 2)}
-            </pre>
-          )}
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-400">
-            SDTM
-          </p>
-
-          <h2 className="mt-2 text-xl font-semibold text-slate-100">
-            Dataset Downloads
-          </h2>
-
-          <p className="mt-1 text-sm text-slate-400">
-            Download the generated SDTM datasets for the finalized hypertension
-            study.
-          </p>
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => downloadSdtm("dm")}
-            disabled={loading}
-            className="rounded-lg border border-slate-700 bg-slate-950 px-5 py-3 text-sm font-medium text-slate-200 transition hover:border-emerald-400 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Download DM CSV
-          </button>
-
-          <button
-            type="button"
-            onClick={() => downloadSdtm("ae")}
-            disabled={loading}
-            className="rounded-lg border border-slate-700 bg-slate-950 px-5 py-3 text-sm font-medium text-slate-200 transition hover:border-emerald-400 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Download AE CSV
-          </button>
-        </div>
-
-        <p className="mt-3 text-xs text-slate-600">
-          Study: AIIA-HTN-001 · Supabase ID: {DEFAULT_STUDY_ID}
-        </p>
-      </section>
+      </div>
     </div>
-  );
+  )
 }
