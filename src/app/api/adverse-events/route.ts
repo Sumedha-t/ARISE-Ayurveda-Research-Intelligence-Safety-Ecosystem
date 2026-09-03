@@ -1,58 +1,61 @@
 import { NextResponse } from "next/server";
 
+import { createClient } from "@/lib/supabase/server";
+
 import {
   createAdverseEvent,
   type CreateAdverseEventInput,
 } from "@/lib/safety/adverse-events";
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   try {
-    const body = (await request.json()) as CreateAdverseEventInput;
+    const { searchParams } = new URL(request.url);
 
-    if (!body.study_id || !body.subject_id) {
+    const studyId = searchParams.get("studyId");
+    const subjectId = searchParams.get("subjectId");
+
+    if (!studyId) {
       return NextResponse.json(
         {
-          error: "study_id and subject_id are required",
+          error: "studyId is required",
         },
         { status: 400 },
       );
     }
 
-    if (!body.event_term?.trim()) {
-      return NextResponse.json(
-        {
-          error: "event_term is required",
-        },
-        { status: 400 },
-      );
+    const supabase = await createClient();
+
+    let query = supabase
+      .from("adverse_events")
+      .select("*")
+      .eq("study_id", studyId)
+      .order("reported_at", { ascending: false });
+
+    if (subjectId) {
+      query = query.eq("subject_id", subjectId);
     }
 
-    if (!body.severity) {
-      return NextResponse.json(
-        {
-          error: "severity is required",
-        },
-        { status: 400 },
-      );
-    }
+    const { data, error } = await query;
 
-    const adverseEvent = await createAdverseEvent(body);
+    if (error) {
+      throw new Error(`Unable to fetch adverse events: ${error.message}`);
+    }
 
     return NextResponse.json(
       {
-        data: adverseEvent,
+        data,
       },
-      { status: 201 },
+      { status: 200 },
     );
   } catch (error) {
-    console.error("Failed to create adverse event:", error);
+    console.error("Failed to fetch adverse events:", error);
 
     return NextResponse.json(
       {
         error:
           error instanceof Error
             ? error.message
-            : "Failed to create adverse event",
+            : "Failed to fetch adverse events",
       },
       { status: 500 },
     );
